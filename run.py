@@ -25,3 +25,4 @@ if __name__ == __name__:
         asyncio.run(main())
     except KeyboardInterrupt:
         print('Бот выключен')
+
