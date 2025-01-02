@@ -2,13 +2,15 @@ from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 from app.states import Text
-'''
+
+"""
 from app.states import Image
-'''
+"""
 from app.states import Code
-'''
+
+"""
 from app.states import Vision
-'''
+"""
 from aiogram.fsm.context import FSMContext
 from app.generators import text_generation
 from app.generators import image_generation
@@ -17,26 +19,30 @@ from app.generators import image_recognition
 from app.database.requests import set_user
 import app.keyboards as kb
 import uuid
-import os 
+import os
 
 user = Router()
+
 
 @user.message(CommandStart())
 async def cmnd_start(message: Message, state: FSMContext):
     await set_user(message.from_user.id)
-    await message.answer(text='Добро пожаловать!', reply_markup=kb.main)
-    await state.clear()   
-
-@user.message(F.text == 'Назад в меню')
-async def cmnd_close(message: Message, state: FSMContext):
-    await set_user(message.from_user.id)
-    await message.answer(text='Вы вернулись в меню!', reply_markup=kb.main)
+    await message.answer(text="Добро пожаловать!", reply_markup=kb.main)
     await state.clear()
 
-@user.message(F.text == 'Генерация текста')
+
+@user.message(F.text == "Назад в меню")
+async def cmnd_close(message: Message, state: FSMContext):
+    await set_user(message.from_user.id)
+    await message.answer(text="Вы вернулись в меню!", reply_markup=kb.main)
+    await state.clear()
+
+
+@user.message(F.text == "Генерация текста")
 async def fn_text(message: Message, state: FSMContext):
     await state.set_state(Text.text)
-    await message.answer(text='Введите ваш запрос...', reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+
 
 @user.message(Text.text)
 async def fn_text_response(message: Message, state: FSMContext):
@@ -45,11 +51,14 @@ async def fn_text_response(message: Message, state: FSMContext):
     await message.answer(res)
     await state.set_state(Text.text)
 
-@user.message(Text.wait)
-async def fn_wait(message: Message):
-    await message.answer(text='Подождите, бот отвечает вам...')
 
-'''
+@user.message(Text.wait)
+@user.message(Code.wait)
+async def fn_wait(message: Message):
+    await message.answer(text="Подождите, бот отвечает вам...")
+
+
+"""
 @user.message(F.text == 'Генерация изображения')
 async def fn_image(message: Message, state: FSMContext):
     await state.set_state(Image.image)
@@ -62,12 +71,14 @@ async def fn_image_response(message: Message, state: FSMContext):
 @user.message(Image.wait)
 async def fn_wait(message: Message):
     await message.answer(text='Подождите, бот отвечает вам...')
-'''
+"""
 
-@user.message(F.text == 'Генерация кода')
+
+@user.message(F.text == "Генерация кода")
 async def fn_code(message: Message, state: FSMContext):
     await state.set_state(Code.code)
-    await message.answer(text='Введите ваш запрос...', reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+
 
 @user.message(Code.code)
 async def fn_code_response(message: Message, state: FSMContext):
@@ -76,11 +87,8 @@ async def fn_code_response(message: Message, state: FSMContext):
     await message.answer(res)
     await state.set_state(Code.code)
 
-@user.message(Code.wait)
-async def fn_wait(message: Message):
-    await message.answer(text='Подождите, бот отвечает вам...')
 
-'''
+"""
 @user.message(F.text == 'Распознавание изображения')
 async def fn_vision(message: Message, state: FSMContext):
     await state.set_state(Vision.vision)
@@ -101,4 +109,4 @@ async def fn_vision_response(message: Message, state: FSMContext):
 @user.message(Vision.wait)
 async def fn_wait(message: Message):
     await message.answer(text='Подождите, бот отвечает вам...')
-'''
+"""
