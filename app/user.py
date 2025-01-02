@@ -38,6 +38,12 @@ async def cmnd_close(message: Message, state: FSMContext):
     await state.clear()
 
 
+@user.message(Text.wait)
+@user.message(Code.wait)
+async def fn_wait(message: Message):
+    await message.answer(text="Подождите, бот отвечает вам...")
+
+
 @user.message(F.text == "Генерация текста")
 async def fn_text(message: Message, state: FSMContext):
     await state.set_state(Text.text)
@@ -50,12 +56,6 @@ async def fn_text_response(message: Message, state: FSMContext):
     res = await text_generation(message.text)
     await message.answer(res)
     await state.set_state(Text.text)
-
-
-@user.message(Text.wait)
-@user.message(Code.wait)
-async def fn_wait(message: Message):
-    await message.answer(text="Подождите, бот отвечает вам...")
 
 
 """
@@ -105,8 +105,4 @@ async def fn_vision_response(message: Message, state: FSMContext):
     await message.answer(res)
     await state.set_state(Vision.vision)
     os.remove(f'{file_name}.jpeg')
-
-@user.message(Vision.wait)
-async def fn_wait(message: Message):
-    await message.answer(text='Подождите, бот отвечает вам...')
 """

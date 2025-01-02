@@ -1,10 +1,4 @@
 import os
-
-import asyncio
-import aiohttp
-import aiofiles
-import base64
-
 from mistralai import Mistral
 from dotenv import load_dotenv
 
@@ -82,10 +76,10 @@ async def image_generation(req):
     }
 
     async with aiohttp.ClientSession() as session:
-        async with session.post("AITOKEN", headers=headers, json=data) as response:
-            if response.status == 200:
-                response_data = await response.json()
-                image_url = response_data.get('image_url')
+        async with session.post("AITOKEN", headers=headers, json=data) as res:
+            if res.status == 200:
+                res_data = await res.json()
+                image_url = res_data.get('image_url')
                 if image_url:
                     return image_url
                 else:
@@ -120,10 +114,10 @@ async def image_recognition(req, file):
         ],
     }
 
-    if req is not None: 
+    if req is not None:
          payload['messages'][0]['content'].append ({
                         "type": "text",
-                        "text": req        
+                        "text": req
                     })
 
 
