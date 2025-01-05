@@ -17,7 +17,7 @@ async def main():
     await dp.start_polling(bot)
 
 
-async def on_startup(dispatcher):
+async def on_startup():
     await async_main()
 
 

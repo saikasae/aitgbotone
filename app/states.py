@@ -6,11 +6,9 @@ class Text(StatesGroup):
     wait = State()
 
 
-"""
 class Image(StatesGroup):
     image = State()
     wait = State()
-"""
 
 
 class Code(StatesGroup):
@@ -18,11 +16,9 @@ class Code(StatesGroup):
     wait = State()
 
 
-"""
 class Vision(StatesGroup):
     vision = State()
     wait = State()
-"""
 
 
 class Mailing(StatesGroup):
