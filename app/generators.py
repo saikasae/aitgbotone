@@ -1,6 +1,10 @@
 import os
+import base64
+import httpx
+
 from mistralai import Mistral
 from dotenv import load_dotenv
+from g4f.client import AsyncClient
 
 load_dotenv()
 
@@ -29,10 +33,6 @@ async def text_generation(req):
     return full_response if full_response else "Ошибка: пустой ответ от AI"
 
 
-async def image_generation(req):
-    pass
-
-
 async def code_generation(req):
     api_key = os.getenv("AITOKEN")
     model = "codestral-2405"
@@ -57,73 +57,75 @@ async def code_generation(req):
     return full_response if full_response else "Ошибка: пустой ответ от AI"
 
 
-async def image_recognition(req):
-    pass
-
-
-"""
-async def image_generation(req):
+async def image_recognition(image, text: str):
+    image = encode_image_to_base64(image)
     api_key = os.getenv("AITOKEN")
-    model = "pixtral-large"
 
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json'
     }
+
     data = {
-        'model': model,
-        'prompt': req
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post("AITOKEN", headers=headers, json=data) as res:
-            if res.status == 200:
-                res_data = await res.json()
-                image_url = res_data.get('image_url')
-                if image_url:
-                    return image_url
-                else:
-                    return "Ошибка: пустой ответ от AI"
-            else:
-                return "Ошибка при выполнении запроса к API"
-
-async def image_encode(image_path):
-        async with aiofiles.open(image_path, "rb") as image_file:
-            return base64.b64encode(await image_file.read()).decode('utf-8')
-"""
-"""
-async def image_recognition(req, file):
-    base64_image = await encode_image(file)
-
-    headers = {
-         "Content-Type": "application/json",
-         "Authorization": f"Bearer {'AITOKEN'}"
-    }
-    payload = {
-    "model": "gpt-4o-mini",
-    "messages": [
+        "model": "pixtral-12b-2409",
+        "messages": [
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
-                    },
-                ],
+                    {"type": "text", "text": text},
+                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image}"}
+                ]
             }
-        ],
+        ]
     }
 
-    if req is not None:
-         payload['messages'][0]['content'].append ({
-                        "type": "text",
-                        "text": req
-                    })
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            'https://api.mistral.ai/v1/chat/completions',
+            headers=headers,
+            json=data
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+        if 'choices' in result and len(result['choices']) > 0:
+            return result['choices'][0]['message']['content']
+        else:
+            return "Извините, не удалось получить ответ от AI"
+
+def encode_image_to_base64(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+async def image_generation(req):
+    client = AsyncClient()
+    api_key = os.getenv("AITOKEN")
+    model = "ministral-3b-latest"
+
+    client_text = Mistral(api_key=api_key)
+
+    response = await client_text.chat.stream_async(
+        model=model,
+        messages=[
+            {
+                "role": "user",
+                "content": f'Улучши запрос для нейросети Flux, которая генерирует изображения, нужен английский язык, вот запрос: {req}',
+            },
+        ],
+    )
+    full_response = ""
+    async for chunk in response:
+        content = chunk.data.choices[0].delta.content
+        if content is not None:
+            full_response += content
+
+    response = await client.images.generate(
+        model='flux',
+        prompt=full_response,
+        response_format="b64_json"
+    )
+
+    return response.data[0].b64_json
 
 
-    async with aiohttp.ClientSession() as session:
-         async with session.post("https://tripfixers.com/wp-content/uploads/2019/11/eiffel-tower-with-snow.jpeg", headers=headers, json=payload) as response:
-              completion = await response.json()
-    return {'response': completion['choices'][0]['message']['content'],
-            'usage': completion['usage']['total_tokens']}
-"""

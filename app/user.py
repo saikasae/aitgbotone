@@ -1,16 +1,14 @@
+import base64
+
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, BufferedInputFile
 from aiogram.filters import CommandStart
+
 from app.states import Text
-
-"""
 from app.states import Image
-"""
 from app.states import Code
-
-"""
 from app.states import Vision
-"""
+
 from aiogram.fsm.context import FSMContext
 from app.generators import text_generation
 from app.generators import image_generation
@@ -58,20 +56,42 @@ async def fn_text_response(message: Message, state: FSMContext):
     await state.set_state(Text.text)
 
 
-"""
 @user.message(F.text == 'Генерация изображения')
 async def fn_image(message: Message, state: FSMContext):
     await state.set_state(Image.image)
     await message.answer(text='Введите ваш запрос...', reply_markup=kb.main2)
 
-@user.message(...)
+@user.message(Image.image)
 async def fn_image_response(message: Message, state: FSMContext):
-    ...
+    try:
+        send_message = await message.answer('Бот рисует картину, подождите пару секунд...')
+        await state.set_state(Image.wait)
+
+        answer = await image_generation(message.text)
+        image_bytes = base64.b64decode(answer)
+
+        await send_message.answer_photo(photo=BufferedInputFile(file=image_bytes, filename='generated_image.jpg'))
+
+        generated_images_dir = 'generated_images'
+        if os.path.exists(generated_images_dir):
+            for file in os.listdir(generated_images_dir):
+                file_path = os.path.join(generated_images_dir, file)
+                try:
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        os.rmdir(generated_images_dir)
+                except Exception as e:
+                    print(f'Ошибка при удалении файла {file_path}: {str(e)}')
+    except Exception as e:
+        print('Произошла ошибка:', str(e))
+        await message.answer("Произошла ошибка при генерации изображения. Попробуйте еще раз.")
+    finally:
+        await state.clear()
+
 
 @user.message(Image.wait)
 async def fn_wait(message: Message):
     await message.answer(text='Подождите, бот отвечает вам...')
-"""
 
 
 @user.message(F.text == "Генерация кода")
@@ -88,7 +108,6 @@ async def fn_code_response(message: Message, state: FSMContext):
     await state.set_state(Code.code)
 
 
-"""
 @user.message(F.text == 'Распознавание изображения')
 async def fn_vision(message: Message, state: FSMContext):
     await state.set_state(Vision.vision)
@@ -97,12 +116,20 @@ async def fn_vision(message: Message, state: FSMContext):
 @user.message(Vision.vision, F.photo)
 async def fn_vision_response(message: Message, state: FSMContext):
     await state.set_state(Vision.wait)
-    file = await message.bot.get_file(message.photo[-1].file_id)
-    file_path = file.file_path
-    file_name = uuid.uuid4()
-    await message.bot.dowload_file(file_path, f'{file_name}.jpeg')
-    res = await image.recognition(message.caption, f'{file_name}.jpeg')
-    await message.answer(res)
-    await state.set_state(Vision.vision)
-    os.remove(f'{file_name}.jpeg')
-"""
+
+    photo = message.photo[-1]
+    file = await message.bot.get_file(photo.file_id)
+    photo_path = f"images/{photo.file_id}.jpg"
+    await message.bot.download(file.file_id, destination=photo_path)
+    caption = message.caption if message.caption else "Опишите это изображение"
+
+    answer = await image_recognition(photo_path, caption)
+
+    if answer is None:
+        await message.answer("Извините, произошла ошибка при обработке изображения. Пожалуйста, попробуйте еще раз.")
+    else:
+        await message.answer(answer)
+    await state.clear()
+
+    os.remove(photo_path)
+
