@@ -21,5 +21,10 @@ class Vision(StatesGroup):
     wait = State()
 
 
+class Internet(StatesGroup):
+    internet = State()
+    wait = State()
+
+
 class Mailing(StatesGroup):
     message = State()

@@ -10,6 +10,9 @@ main = ReplyKeyboardMarkup(
         [
             KeyboardButton(text="Распознавание изображения"),
         ],
+        [
+            KeyboardButton(text="Поиск в Интернете"),
+        ],
     ],
     resize_keyboard=True,
 )
