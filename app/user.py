@@ -180,7 +180,7 @@ async def fn_vision_response(message: Message, state: FSMContext):
         answer = await image_recognition(photo_path, caption)
         if answer is None:
             await message.answer(
-                "Извините, произошла ошибка при обработке изображения. Пожалуйста, попробуйте ещё раз."
+                "Извините, произошла ошибка при обработке изображения. Пожалуйста, попробуйте ещё раз"
             )
         else:
             await processing_message.edit_text(answer)
@@ -188,7 +188,7 @@ async def fn_vision_response(message: Message, state: FSMContext):
         await state.set_state(Vision.vision)
     except Exception as e:
         print(f"Ошибка: {e}")
-        await message.answer("Произошла ошибка. Пожалуйста, попробуйте ещё раз.")
+        await message.answer("Произошла ошибка. Пожалуйста, попробуйте ещё раз")
     finally:
         additional_message_task.cancel()
         os.remove(photo_path)
