@@ -13,18 +13,13 @@ logger = logging.getLogger(__name__)
 
 async def text_generation(req):
     api_key = os.getenv("AITOKEN")
-    model = "ministral-3b-latest"
+    model = "mistral-large-2411"
 
     client = Mistral(api_key=api_key)
 
     response = await client.chat.stream_async(
         model=model,
-        messages=[
-            {
-                "role": "user",
-                "content": req,
-            },
-        ],
+        messages=req,
     )
     full_response = ""
     async for chunk in response:
@@ -72,12 +67,7 @@ async def code_generation(req):
 
     response = await client.chat.stream_async(
         model=model,
-        messages=[
-            {
-                "role": "user",
-                "content": f"Отвечай только на русском языке, вот мой запрос: {req}",
-            },
-        ],
+        messages=req,
     )
     full_response = ""
     async for chunk in response:
@@ -95,7 +85,7 @@ async def image_recognition(image, text: str):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
     data = {
-        "model": "pixtral-12b-2409",
+        "model": "pixtral-large-2411",
         "messages": [
             {
                 "role": "user",
@@ -133,6 +123,7 @@ async def search_with_mistral(query: str) -> str:
     api_key = os.getenv("AITOKEN")
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {"query": query}
+
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(

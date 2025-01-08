@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 from app.user import user
 from app.admin import admin
-from app.util import set_default_description
+from app.utils.description import set_default_description
 from app.database.models import async_main
 from aiogram.client.default import DefaultBotProperties
 

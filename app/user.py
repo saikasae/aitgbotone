@@ -14,12 +14,14 @@ from app.generators import code_generation
 from app.generators import image_recognition
 from app.generators import search_with_mistral
 from app.database.requests import set_user
+from app.utils.trim_history import trim_history
 import app.keyboards as kb
 import os
 import base64
 import asyncio
 
 user = Router()
+history = {}
 
 
 @user.message(CommandStart())
@@ -64,10 +66,25 @@ async def fn_text_response(message: Message, state: FSMContext):
                 f"Подождите ещё {int(remaining_time)} секунд перед следующим запросом"
             )
             return
-    await message.answer("Бот генерирует ответ, подождите пару секунд...")
+    send_message = await message.answer(
+        "Бот думает над ответом, подождите пару секунд..."
+    )
     await state.set_state(Text.wait)
-    res = await text_generation(message.text)
-    await message.answer(res)
+    if message.from_user.id not in history:
+        history[message.from_user.id] = []
+    history[message.from_user.id].append({"role": "user", "content": message.text})
+    history[message.from_user.id] = await trim_history(
+        history[message.from_user.id], max_length=4096, max_messages=5
+    )
+    answer = await text_generation(history[message.from_user.id])
+
+    if not answer:
+        raise ValueError("Пустой ответ от модели")
+    history[message.from_user.id].append({"role": "assistant", "content": answer})
+    history[message.from_user.id] = await trim_history(
+        history[message.from_user.id], max_length=4096, max_messages=5
+    )
+    await send_message.reply(answer)
     await state.update_data(last_request_time=current_time.isoformat())
     await state.set_state(Text.text)
 
@@ -134,8 +151,21 @@ async def fn_code_response(message: Message, state: FSMContext):
         "Бот генерирует ответ, подождите пару секунд..."
     )
     await state.set_state(Code.wait)
-    res = await code_generation(message.text)
-    await send_message.answer(res)
+    if message.from_user.id not in history:
+        history[message.from_user.id] = []
+    history[message.from_user.id].append({"role": "user", "content": message.text})
+    history[message.from_user.id] = await trim_history(
+        history[message.from_user.id], max_length=4096, max_messages=5
+    )
+    answer = await code_generation(history[message.from_user.id])
+
+    if not answer:
+        raise ValueError("Пустой ответ от модели")
+    history[message.from_user.id].append({"role": "assistant", "content": answer})
+    history[message.from_user.id] = await trim_history(
+        history[message.from_user.id], max_length=4096, max_messages=5
+    )
+    await send_message.answer(answer)
     await state.update_data(last_request_time=current_time.isoformat())
     await state.set_state(Code.code)
 
@@ -205,8 +235,10 @@ async def fn_internet_response(message: Message, state: FSMContext):
     current_time = datetime.now()
     data = await state.get_data()
     last_request_time = data.get("last_request_time")
+
     if last_request_time:
         last_request_time = datetime.fromisoformat(last_request_time)
+
         if current_time - last_request_time < timedelta(seconds=15):
             remaining_time = 15 - (current_time - last_request_time).total_seconds()
             await message.answer(
@@ -217,7 +249,9 @@ async def fn_internet_response(message: Message, state: FSMContext):
         "Бот генерирует ответ, подождите пару секунд..."
     )
     await state.set_state(Internet.wait)
+
     res = search_with_mistral(message.text)
+
     await send_message.answer(res)
     await state.update_data(last_request_time=current_time.isoformat())
     await state.set_state(Internet.internet)
