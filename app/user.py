@@ -1,40 +1,43 @@
 from aiogram import Router, F
 from datetime import datetime, timedelta
-from aiogram.types import Message, BufferedInputFile
+from aiogram.types import Message, BufferedInputFile, CallbackQuery
 from aiogram.filters import CommandStart
-from app.states import Text
-from app.states import Image
-from app.states import Code
-from app.states import Vision
-from app.states import Internet
 from aiogram.fsm.context import FSMContext
-from app.generators import text_generation
-from app.generators import image_generation
-from app.generators import code_generation
-from app.generators import image_recognition
-from app.generators import search_with_mistral
-from app.database.requests import set_user
-from app.utils.trim_history import trim_history
-import app.keyboards as kb
 import os
 import base64
-import asyncio
+
+from app.states import Text, Image, Code, Vision, Internet
+from app.generators import text_generation, image_generation, code_generation, image_recognition, search_with_mistral
+from app.database.requests import set_user
+from app.utils.trim_history import trim_history
+from app.middleware import CheckSubscribeMiddleware
+import app.keyboards as kb
 
 user = Router()
+user.message.middleware(CheckSubscribeMiddleware())
+user.callback_query.middleware(CheckSubscribeMiddleware())
+
 history = {}
+
+@user.callback_query()
+async def check_query(message: CallbackQuery, state: FSMContext):
+    if str(message.data) == 'subscribe':
+        await set_user(message.from_user.id)
+        await message.bot.send_message(text="Добро пожаловать!", reply_markup=kb.get_main_keyboard(), chat_id=message.from_user.id)
+        await state.clear()
 
 
 @user.message(CommandStart())
 async def cmnd_start(message: Message, state: FSMContext):
     await set_user(message.from_user.id)
-    await message.answer(text="Добро пожаловать!", reply_markup=kb.main)
+    await message.answer(text="Добро пожаловать!", reply_markup=kb.get_main_keyboard())
     await state.clear()
 
 
 @user.message(F.text == "Назад в меню")
 async def cmnd_close(message: Message, state: FSMContext):
     await set_user(message.from_user.id)
-    await message.answer(text="Вы вернулись в меню!", reply_markup=kb.main)
+    await message.answer(text="Вы вернулись в меню!", reply_markup=kb.get_main_keyboard())
     await state.clear()
 
 
@@ -50,7 +53,7 @@ async def fn_wait(message: Message):
 @user.message(F.text == "Генерация текста")
 async def fn_text(message: Message, state: FSMContext):
     await state.set_state(Text.text)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Text.text)
@@ -92,7 +95,7 @@ async def fn_text_response(message: Message, state: FSMContext):
 @user.message(F.text == "Генерация изображения")
 async def fn_image(message: Message, state: FSMContext):
     await state.set_state(Image.image)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Image.image)
@@ -131,7 +134,7 @@ async def fn_image_response(message: Message, state: FSMContext):
 @user.message(F.text == "Генерация кода")
 async def fn_code(message: Message, state: FSMContext):
     await state.set_state(Code.code)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Code.code)
@@ -173,12 +176,13 @@ async def fn_code_response(message: Message, state: FSMContext):
 @user.message(F.text == "Распознавание изображения")
 async def fn_vision(message: Message, state: FSMContext):
     await state.set_state(Vision.vision)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Vision.vision, F.photo)
 async def fn_vision_response(message: Message, state: FSMContext):
     current_time = datetime.now()
+
     data = await state.get_data()
     last_request_time = data.get("last_request_time")
     if last_request_time:
@@ -189,24 +193,18 @@ async def fn_vision_response(message: Message, state: FSMContext):
                 f"Подождите ещё {int(remaining_time)} секунд перед следующим запросом"
             )
             return
+
     processing_message = await message.answer(
         "Бот генерирует ответ, подождите пару секунд..."
     )
 
-    async def send_additional_message():
-        await asyncio.sleep(5)
-        await processing_message.edit_text(
-            "Обработка занимает больше времени, пожалуйста, подождите..."
-        )
-
-    additional_message_task = asyncio.create_task(send_additional_message())
     try:
         await state.set_state(Vision.wait)
         photo = message.photo[-1]
         file = await message.bot.get_file(photo.file_id)
         photo_path = f"images/{photo.file_id}.jpg"
-        await message.bot.download(file.file_id, destination=photo_path)
-        caption = message.caption if message.caption else "Опишите это изображение"
+        await message.bot.download(file.file_id, destination=photo_path, timeout=90)
+        caption = message.caption if message.caption else "Опиши это изображение как можно подробнее."
         answer = await image_recognition(photo_path, caption)
         if answer is None:
             await message.answer(
@@ -214,20 +212,20 @@ async def fn_vision_response(message: Message, state: FSMContext):
             )
         else:
             await processing_message.edit_text(answer)
+
         await state.update_data(last_request_time=current_time.isoformat())
         await state.set_state(Vision.vision)
     except Exception as e:
-        print(f"Ошибка: {e}")
+        print(f"Ошибка: {type(e).__name__}")
         await message.answer("Произошла ошибка. Пожалуйста, попробуйте ещё раз")
     finally:
-        additional_message_task.cancel()
         os.remove(photo_path)
 
 
 @user.message(F.text == "Поиск в Интернете")
 async def fn_internet(message: Message, state: FSMContext):
     await state.set_state(Internet.internet)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Internet.internet)
@@ -250,7 +248,7 @@ async def fn_internet_response(message: Message, state: FSMContext):
     )
     await state.set_state(Internet.wait)
 
-    res = search_with_mistral(message.text)
+    res = await search_with_mistral(message.text)
 
     await send_message.answer(res)
     await state.update_data(last_request_time=current_time.isoformat())

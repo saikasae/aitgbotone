@@ -1,11 +1,14 @@
+import asyncio
 import os
 import base64
 import httpx
-import aiohttp
 import logging
+import duckduckgo_search
 from mistralai import Mistral
 from dotenv import load_dotenv
+from bs4 import BeautifulSoup
 from g4f.client import AsyncClient
+
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -100,13 +103,12 @@ async def image_recognition(image, text: str):
         ],
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             "https://api.mistral.ai/v1/chat/completions", headers=headers, json=data
         )
 
         response.raise_for_status()
-
         result = response.json()
         if "choices" in result and len(result["choices"]) > 0:
             return result["choices"][0]["message"]["content"]
@@ -121,17 +123,64 @@ def encode_image_to_base64(image_path):
 
 async def search_with_mistral(query: str) -> str:
     api_key = os.getenv("AITOKEN")
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    data = {"query": query}
+    model = "mistral-large-2411"
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(
-                "https://api.mistral.ai/v1/chat/completions", headers=headers, json=data
-            ) as response:
-                response.raise_for_status()  # Вызовет исключение для HTTP-ошибок
-                result = await response.json()
-                return result.get("result", "Нет результатов")
-        except aiohttp.ClientError as e:
-            logger.error(f"Ошибка при выполнении запроса: {e}")
-            return "Ошибка при выполнении запроса. Пожалуйста, попробуйте позже"
+    client = Mistral(api_key=api_key)
+
+    response = await client.chat.stream_async(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": f"Сформулируй наиболее эффективный и релевантный запрос для веб-поиска, чтобы ответить на сообщение пользователя: '{query}'. Верни только текст поискового запроса.",
+            },
+        ],
+    )
+
+    web_search_text = ""
+    async for chunk in response:
+        content = chunk.data.choices[0].delta.content
+        if content is not None:
+            web_search_text += content
+
+    searcher = duckduckgo_search.DDGS()
+
+    search_data = searcher.text(web_search_text, safesearch='off', max_results=3, region='ru-ru')
+    web_data = []
+    async with httpx.AsyncClient() as client_http:
+        for result in search_data:
+            try:
+                response_http = await client_http.get(result['href'], timeout=10)
+                response_http.raise_for_status()
+                soup = BeautifulSoup(response_http.text, 'html.parser')
+                # Извлекаем основной текст со страницы (можно настроить селекторы)
+                paragraphs = soup.find_all('p')
+                page_text = ' '.join([p.text for p in paragraphs])
+                web_data.append(
+                    f"Источник: {result['href']}\nСодержание: {page_text[:550]}...")  # Ограничим длину
+            except Exception as e:
+                logger.error(f"Ошибка при парсинге {result['href']}: {e}")
+                web_data.append(f"Не удалось получить содержимое с {result['href']}")
+
+
+    response = await client.chat.stream_async(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": f"Используя только информацию, представленную в содержании следующих веб-страниц, ответь на вопрос пользователя. Синтезируй информацию из разных источников, чтобы дать полный и точный ответ. Избегай домыслов и не добавляй информацию, которой нет на предоставленных страницах. Вот содержание веб-страниц:\n\n{' '.join(web_data)}\n\nВопрос пользователя: {query}",
+            },
+            {
+                "role": "user",
+                "content": query
+            }
+        ],
+    )
+
+    full_response = ""
+    async for chunk in response:
+        content = chunk.data.choices[0].delta.content
+        if content is not None:
+            full_response += content
+
+    return full_response if full_response else "Ошибка: пустой ответ от AI"
