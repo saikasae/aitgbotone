@@ -2,23 +2,15 @@ from aiogram import Router, F
 from datetime import datetime, timedelta
 from aiogram.types import Message, BufferedInputFile
 from aiogram.filters import CommandStart
-from app.states import Text
-from app.states import Image
-from app.states import Code
-from app.states import Vision
-from app.states import Internet
 from aiogram.fsm.context import FSMContext
-from app.generators import text_generation
-from app.generators import image_generation
-from app.generators import code_generation
-from app.generators import image_recognition
-from app.generators import search_with_mistral
+import os
+import base64
+
+from app.states import Text, Image, Code, Vision, Internet
+from app.generators import text_generation, image_generation, code_generation, image_recognition, search_with_mistral
 from app.database.requests import set_user
 from app.utils.trim_history import trim_history
 import app.keyboards as kb
-import os
-import base64
-import asyncio
 
 user = Router()
 history = {}
@@ -179,6 +171,7 @@ async def fn_vision(message: Message, state: FSMContext):
 @user.message(Vision.vision, F.photo)
 async def fn_vision_response(message: Message, state: FSMContext):
     current_time = datetime.now()
+
     data = await state.get_data()
     last_request_time = data.get("last_request_time")
     if last_request_time:
@@ -189,24 +182,18 @@ async def fn_vision_response(message: Message, state: FSMContext):
                 f"Подождите ещё {int(remaining_time)} секунд перед следующим запросом"
             )
             return
+
     processing_message = await message.answer(
         "Бот генерирует ответ, подождите пару секунд..."
     )
 
-    async def send_additional_message():
-        await asyncio.sleep(5)
-        await processing_message.edit_text(
-            "Обработка занимает больше времени, пожалуйста, подождите..."
-        )
-
-    additional_message_task = asyncio.create_task(send_additional_message())
     try:
         await state.set_state(Vision.wait)
         photo = message.photo[-1]
         file = await message.bot.get_file(photo.file_id)
         photo_path = f"images/{photo.file_id}.jpg"
-        await message.bot.download(file.file_id, destination=photo_path)
-        caption = message.caption if message.caption else "Опишите это изображение"
+        await message.bot.download(file.file_id, destination=photo_path, timeout=90)
+        caption = message.caption if message.caption else "Опиши это изображение как можно подробнее."
         answer = await image_recognition(photo_path, caption)
         if answer is None:
             await message.answer(
@@ -214,13 +201,13 @@ async def fn_vision_response(message: Message, state: FSMContext):
             )
         else:
             await processing_message.edit_text(answer)
+
         await state.update_data(last_request_time=current_time.isoformat())
         await state.set_state(Vision.vision)
     except Exception as e:
-        print(f"Ошибка: {e}")
+        print(f"Ошибка: {type(e).__name__}")
         await message.answer("Произошла ошибка. Пожалуйста, попробуйте ещё раз")
     finally:
-        additional_message_task.cancel()
         os.remove(photo_path)
 
 
@@ -250,7 +237,7 @@ async def fn_internet_response(message: Message, state: FSMContext):
     )
     await state.set_state(Internet.wait)
 
-    res = search_with_mistral(message.text)
+    res = await search_with_mistral(message.text)
 
     await send_message.answer(res)
     await state.update_data(last_request_time=current_time.isoformat())
