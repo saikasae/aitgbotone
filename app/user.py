@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from datetime import datetime, timedelta
-from aiogram.types import Message, BufferedInputFile
+from aiogram.types import Message, BufferedInputFile, CallbackQuery
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 import os
@@ -10,23 +10,34 @@ from app.states import Text, Image, Code, Vision, Internet
 from app.generators import text_generation, image_generation, code_generation, image_recognition, search_with_mistral
 from app.database.requests import set_user
 from app.utils.trim_history import trim_history
+from app.middleware import CheckSubscribeMiddleware
 import app.keyboards as kb
 
 user = Router()
+user.message.middleware(CheckSubscribeMiddleware())
+user.callback_query.middleware(CheckSubscribeMiddleware())
+
 history = {}
+
+@user.callback_query()
+async def check_query(message: CallbackQuery, state: FSMContext):
+    if str(message.data) == 'subscribe':
+        await set_user(message.from_user.id)
+        await message.bot.send_message(text="Добро пожаловать!", reply_markup=kb.get_main_keyboard(), chat_id=message.from_user.id)
+        await state.clear()
 
 
 @user.message(CommandStart())
 async def cmnd_start(message: Message, state: FSMContext):
     await set_user(message.from_user.id)
-    await message.answer(text="Добро пожаловать!", reply_markup=kb.main)
+    await message.answer(text="Добро пожаловать!", reply_markup=kb.get_main_keyboard())
     await state.clear()
 
 
 @user.message(F.text == "Назад в меню")
 async def cmnd_close(message: Message, state: FSMContext):
     await set_user(message.from_user.id)
-    await message.answer(text="Вы вернулись в меню!", reply_markup=kb.main)
+    await message.answer(text="Вы вернулись в меню!", reply_markup=kb.get_main_keyboard())
     await state.clear()
 
 
@@ -42,7 +53,7 @@ async def fn_wait(message: Message):
 @user.message(F.text == "Генерация текста")
 async def fn_text(message: Message, state: FSMContext):
     await state.set_state(Text.text)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Text.text)
@@ -84,7 +95,7 @@ async def fn_text_response(message: Message, state: FSMContext):
 @user.message(F.text == "Генерация изображения")
 async def fn_image(message: Message, state: FSMContext):
     await state.set_state(Image.image)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Image.image)
@@ -123,7 +134,7 @@ async def fn_image_response(message: Message, state: FSMContext):
 @user.message(F.text == "Генерация кода")
 async def fn_code(message: Message, state: FSMContext):
     await state.set_state(Code.code)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Code.code)
@@ -165,7 +176,7 @@ async def fn_code_response(message: Message, state: FSMContext):
 @user.message(F.text == "Распознавание изображения")
 async def fn_vision(message: Message, state: FSMContext):
     await state.set_state(Vision.vision)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Vision.vision, F.photo)
@@ -214,7 +225,7 @@ async def fn_vision_response(message: Message, state: FSMContext):
 @user.message(F.text == "Поиск в Интернете")
 async def fn_internet(message: Message, state: FSMContext):
     await state.set_state(Internet.internet)
-    await message.answer(text="Введите ваш запрос...", reply_markup=kb.main2)
+    await message.answer(text="Введите ваш запрос...", reply_markup=kb.get_main2_keyboard())
 
 
 @user.message(Internet.internet)
