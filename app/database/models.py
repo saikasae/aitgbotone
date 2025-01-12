@@ -1,7 +1,6 @@
 from sqlalchemy import BigInteger
-from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
-from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 engine = create_async_engine(url="sqlite+aiosqlite:///db.sqlite3", echo=True)
 
@@ -15,7 +14,7 @@ class Base(AsyncAttrs, DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
 
 

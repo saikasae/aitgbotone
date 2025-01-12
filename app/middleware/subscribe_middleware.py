@@ -1,7 +1,9 @@
 import os
-from typing import Callable, Awaitable, Dict, Any
-from aiogram import BaseMiddleware, Bot
-from aiogram.types import Message, CallbackQuery
+from typing import Any, Awaitable, Callable, Dict
+
+from aiogram import BaseMiddleware
+from aiogram.types import CallbackQuery, Message
+
 from app.keyboards import get_subs_keyboard
 
 
@@ -16,14 +18,15 @@ class CheckSubscribeMiddleware(BaseMiddleware):
         group = os.getenv("GROUP")
         try:
             user_subscription_status = await message.bot.get_chat_member(
-                chat_id=group, user_id=user.id,
+                chat_id=group,
+                user_id=user.id,
             )
 
             status = str(user_subscription_status).split()[0][8:-1]
             if status == "left":
                 await message.answer(
-                    "👋 Для того, чтобы пользоваться ботом, вам необходимо подписаться на наш канал\n"
-                    "После подписки, нажмите на соответствующую кнопку",
+                    "👋 Привет! Так как наш бот абсолютно бесплатный, единственная просьба — подписка на наш канал. Там много интересного о мире ИИ, тебе точно понравится!\n"
+                    "После подписки нажми на соответствующую кнопку",
                     reply_markup=get_subs_keyboard(),
                 )
                 return

@@ -1,9 +1,10 @@
 from aiogram import Router
-from aiogram.types import Message
-from aiogram.filters import Filter, Command
+from aiogram.filters import Command, Filter
 from aiogram.fsm.context import FSMContext
-from app.states import Mailing
+from aiogram.types import Message
+
 from app.database.requests import get_users
+from app.states import Mailing
 
 admin = Router()
 
@@ -29,4 +30,5 @@ async def mailing_message(message: Message, state: FSMContext):
             await message.send_copy(chat_id=user.tg_id)
         except Exception as e:
             print(e)
+
     await message.answer("Рассылка завершена")
