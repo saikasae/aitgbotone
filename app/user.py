@@ -1,12 +1,10 @@
 import base64
 import os
 from datetime import datetime, timedelta
-
 from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
-
 import app.keyboards as kb
 from app.database.requests import set_user
 from app.generators import (
@@ -91,7 +89,9 @@ async def fn_text_response(message: Message, state: FSMContext):
     send_message = await message.answer(
         "Бот думает над ответом, подождите пару секунд...",
     )
+
     await state.set_state(Text.wait)
+
     if message.from_user.id not in history:
         history[message.from_user.id] = []
 
@@ -101,17 +101,28 @@ async def fn_text_response(message: Message, state: FSMContext):
         max_length=4096,
         max_messages=5,
     )
-    answer = await text_generation(history[message.from_user.id])
-    if not answer:
-        raise ValueError("Пустой ответ от модели")
 
-    history[message.from_user.id].append({"role": "assistant", "content": answer})
+    answer_data = await text_generation(history[message.from_user.id])
+
+    if not answer_data or not isinstance(answer_data, dict):
+        raise ValueError("Неверный формат ответа от модели")
+
+    text_response = answer_data.get("text")
+    image_response = answer_data.get("image")
+
+    history[message.from_user.id].append({"role": "assistant", "content": text_response})
     history[message.from_user.id] = await trim_history(
         history[message.from_user.id],
         max_length=4096,
         max_messages=5,
     )
-    await send_message.answer(answer)
+
+    if image_response:
+        image_bytes = base64.b64decode(image_response)
+        await message.answer_photo(photo=BufferedInputFile(image_bytes, filename="latex.png"))
+    else:
+        await send_message.answer(text_response)
+
     await state.update_data(last_request_time=current_time.isoformat())
     await state.set_state(Text.text)
 
