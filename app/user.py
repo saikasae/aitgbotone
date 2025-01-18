@@ -1,19 +1,17 @@
 import base64
 import os
 from datetime import datetime, timedelta
+
 from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
+
 import app.keyboards as kb
 from app.database.requests import set_user
-from app.generators import (
-    code_generation,
-    image_generation,
-    image_recognition,
-    search_with_mistral,
-    text_generation,
-)
+from app.generators import (code_generation, image_generation,
+                            image_recognition, search_with_mistral,
+                            text_generation)
 from app.middleware.subscribe_middleware import CheckSubscribeMiddleware
 from app.states import Code, Image, Internet, Text, Vision
 from app.utils.trim_history import trim_history

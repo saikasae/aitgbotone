@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+
 import duckduckgo_search
 import httpx
 from bs4 import BeautifulSoup
