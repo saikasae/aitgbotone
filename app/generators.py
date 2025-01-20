@@ -65,7 +65,7 @@ async def code_generation(req):
     client = Mistral(api_key=api_key)
     response = await client.chat.stream_async(
         model=model,
-        messages=req,
+        messages=f"Пиши пояснения только на русском языке, а не на английском. Вот данный запрос: {req}",
     )
     full_response = ""
     async for chunk in response:
