@@ -28,7 +28,7 @@ def get_main2_keyboard():
 def get_subs_keyboard():
     builder = InlineKeyboardBuilder()
 
-    builder.button(text="Перейти в канал", url="https://t.me/+9I7iLTq7vwYzZDIy")
+    builder.button(text="Перейти в канал", url="https://t.me/dsfgdgdfgdfgsdfg")
     builder.button(text="✅ Я подписался на канал!", callback_data="subscribe")
 
     builder.adjust(1)
